@@ -359,6 +359,7 @@ final class JavaScriptMessagesController implements InvocableController
             'strAddingPrimaryKey' => __('Adding primary key'),
             'strOK' => __('OK'),
             'strDismiss' => __('Click to dismiss this notification'),
+            'strConfirm' => __('Confirm'),
 
             /* For database/operations.js */
             'strRenamingDatabases' => __('Renaming databases'),
@@ -398,6 +399,7 @@ final class JavaScriptMessagesController implements InvocableController
             'strHideQueryBox' => __('Hide query box'),
             'strShowQueryBox' => __('Show query box'),
             'strEdit' => __('Edit'),
+            'strEditQuery' => __('Edit query'),
             'strDelete' => __('Delete'),
             'strNotValidRowNumber' => __('%d is not valid row number.'),
             'strBrowseForeignValues' => __('Browse foreign values'),
@@ -462,7 +464,7 @@ final class JavaScriptMessagesController implements InvocableController
             'strHideFindNReplaceCriteria' => __('Hide find and replace criteria'),
             'strShowFindNReplaceCriteria' => __('Show find and replace criteria'),
 
-            /* For table/zoom_plot_jqplot.js */
+            /* For table/zoom_search.js */
             'strDisplayHelp' => '<ul><li>'
                 . __('Each point represents a data row.')
                 . '</li><li>'
@@ -485,6 +487,7 @@ final class JavaScriptMessagesController implements InvocableController
 
             /* For table/change.js */
             'strIgnore' => __('Ignore'),
+            'strCopyToClipboard' => __('Copy to clipboard'),
             'strCopy' => __('Copy'),
             'strX' => __('X'),
             'strY' => __('Y'),

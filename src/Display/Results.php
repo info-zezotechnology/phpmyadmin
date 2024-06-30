@@ -16,6 +16,7 @@ use PhpMyAdmin\FieldMetadata;
 use PhpMyAdmin\Html\Generator;
 use PhpMyAdmin\Index;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Plugins\Transformations\Output\Text_Octetstream_Sql;
 use PhpMyAdmin\Plugins\Transformations\Output\Text_Plain_Json;
 use PhpMyAdmin\Plugins\Transformations\Output\Text_Plain_Sql;
@@ -29,6 +30,7 @@ use PhpMyAdmin\SqlParser\Utils\Query;
 use PhpMyAdmin\SqlParser\Utils\StatementInfo;
 use PhpMyAdmin\SqlParser\Utils\StatementType;
 use PhpMyAdmin\Table\Table;
+use PhpMyAdmin\Table\UiProperty;
 use PhpMyAdmin\Template;
 use PhpMyAdmin\Theme\ThemeManager;
 use PhpMyAdmin\Transformations;
@@ -84,10 +86,10 @@ use function trim;
  */
 class Results
 {
-    public const POSITION_LEFT = 'left';
-    public const POSITION_RIGHT = 'right';
-    public const POSITION_BOTH = 'both';
-    public const POSITION_NONE = 'none';
+    private const POSITION_LEFT = 'left';
+    private const POSITION_RIGHT = 'right';
+    private const POSITION_BOTH = 'both';
+    private const POSITION_NONE = 'none';
 
     public const DISPLAY_FULL_TEXT = 'F';
     public const DISPLAY_PARTIAL_TEXT = 'P';
@@ -99,15 +101,14 @@ class Results
     public const GEOMETRY_DISP_WKT = 'WKT';
     public const GEOMETRY_DISP_WKB = 'WKB';
 
-    public const SMART_SORT_ORDER = 'SMART';
-    public const ASCENDING_SORT_DIR = 'ASC';
-    public const DESCENDING_SORT_DIR = 'DESC';
+    private const SMART_SORT_ORDER = 'SMART';
+    private const ASCENDING_SORT_DIR = 'ASC';
+    private const DESCENDING_SORT_DIR = 'DESC';
 
-    public const TABLE_TYPE_INNO_DB = 'InnoDB';
     public const ALL_ROWS = 'all';
 
-    public const ACTION_LINK_CONTENT_ICONS = 'icons';
-    public const ACTION_LINK_CONTENT_TEXT = 'text';
+    private const ACTION_LINK_CONTENT_ICONS = 'icons';
+    private const ACTION_LINK_CONTENT_TEXT = 'text';
 
     /**
      * the total number of rows returned by the SQL query without any appended "LIMIT" clause programmatically
@@ -678,7 +679,6 @@ class Results
      * @param mixed[]            $sortDirection             sort direction
      * @param bool               $isLimitedDisplay          with limited operations
      *                                                        or not
-     * @param string             $unsortedSqlQuery          query without the sort part
      *
      * @return string html content
      */
@@ -689,7 +689,6 @@ class Results
         array $sortExpressionNoDirection,
         array $sortDirection,
         bool $isLimitedDisplay,
-        string $unsortedSqlQuery,
     ): string {
         // required to generate sort links that will remember whether the
         // "Show all" button has been clicked
@@ -726,7 +725,7 @@ class Results
                     $this->fieldsMeta[$i],
                     $sortExpression,
                     $sortExpressionNoDirection,
-                    $unsortedSqlQuery,
+                    $statementInfo,
                     $sessionMaxRows,
                     $comments,
                     $sortDirection,
@@ -774,7 +773,6 @@ class Results
      *
      * @see getTable()
      *
-     * @param string             $unsortedSqlQuery          the unsorted sql query
      * @param mixed[]            $sortExpression            sort expression
      * @param array<int, string> $sortExpressionNoDirection sort expression without direction
      * @param mixed[]            $sortDirection             sort direction
@@ -792,7 +790,6 @@ class Results
     private function getTableHeaders(
         DisplayParts $displayParts,
         StatementInfo $statementInfo,
-        string $unsortedSqlQuery,
         array $sortExpression = [],
         array $sortExpressionNoDirection = [],
         array $sortDirection = [],
@@ -836,7 +833,6 @@ class Results
             $sortExpressionNoDirection,
             $sortDirection,
             $isLimitedDisplay,
-            $unsortedSqlQuery,
         );
 
         // Display column at rightside - checkboxes or empty column
@@ -1132,7 +1128,7 @@ class Results
             . $themeManager->theme->getImgPath($tmpImageFile)
             . '" alt="' . $tmpTxt . '" title="' . $tmpTxt . '">';
 
-        return Generator::linkOrButton(Url::getFromRoute('/sql'), $urlParamsFullText, $tmpImage);
+        return Generator::linkOrButton(Url::getFromRoute('/sql', $urlParamsFullText, false), null, $tmpImage);
     }
 
     /**
@@ -1163,7 +1159,6 @@ class Results
      * @param FieldMetadata      $fieldsMeta                set of field properties
      * @param mixed[]            $sortExpression            sort expression
      * @param array<int, string> $sortExpressionNoDirection sort expression without direction
-     * @param string             $unsortedSqlQuery          the unsorted sql query
      * @param int                $sessionMaxRows            maximum rows resulted by sql
      * @param string             $comments                  comment for row
      * @param mixed[]            $sortDirection             sort direction
@@ -1185,7 +1180,7 @@ class Results
         FieldMetadata $fieldsMeta,
         array $sortExpression,
         array $sortExpressionNoDirection,
-        string $unsortedSqlQuery,
+        StatementInfo $statementInfo,
         int $sessionMaxRows,
         string $comments,
         array $sortDirection,
@@ -1214,19 +1209,16 @@ class Results
             $fieldsMeta,
         );
 
-        if (
-            preg_match(
-                '@(.*)([[:space:]](LIMIT (.*)|PROCEDURE (.*)|FOR UPDATE|LOCK IN SHARE MODE))@is',
-                $unsortedSqlQuery,
-                $regs3,
-            )
-        ) {
-            $singleSortedSqlQuery = $regs3[1] . $singleSortOrder . $regs3[2];
-            $multiSortedSqlQuery = $regs3[1] . $multiSortOrder . $regs3[2];
-        } else {
-            $singleSortedSqlQuery = $unsortedSqlQuery . $singleSortOrder;
-            $multiSortedSqlQuery = $unsortedSqlQuery . $multiSortOrder;
-        }
+        $singleSortedSqlQuery = Query::replaceClause(
+            $statementInfo->statement,
+            $statementInfo->parser->list,
+            $singleSortOrder,
+        );
+        $multiSortedSqlQuery = Query::replaceClause(
+            $statementInfo->statement,
+            $statementInfo->parser->list,
+            $multiSortOrder,
+        );
 
         $singleUrlParams = [
             'db' => $this->db,
@@ -1505,16 +1497,15 @@ class Results
         array $orderUrlParams,
         array $multiOrderUrlParams,
     ): string {
-        $urlPath = Url::getFromRoute('/sql');
+        $urlPath = Url::getFromRoute('/sql', $multiOrderUrlParams, false);
         $innerLinkContent = htmlspecialchars($fieldsMeta->name) . $orderImg
             . '<input type="hidden" value="'
             . $urlPath
-            . Url::getCommon($multiOrderUrlParams, str_contains($urlPath, '?') ? '&' : '?', false)
             . '">';
 
         return Generator::linkOrButton(
-            Url::getFromRoute('/sql'),
-            $orderUrlParams,
+            Url::getFromRoute('/sql', $orderUrlParams, false),
+            null,
             $innerLinkContent,
             ['class' => 'sortlink'],
         );
@@ -2391,26 +2382,26 @@ class Results
 
         if ($this->isSelect($statementInfo)) {
             $pmatable = new Table($this->table, $this->db, $this->dbi);
-            $colOrder = $pmatable->getUiProp(Table::PROP_COLUMN_ORDER);
+            $colOrder = $pmatable->getUiProp(UiProperty::ColumnOrder);
             $fieldsCount = count($this->fieldsMeta);
             /* Validate the value */
             if (is_array($colOrder)) {
                 foreach ($colOrder as $value) {
                     if ($value >= $fieldsCount) {
-                        $pmatable->removeUiProp(Table::PROP_COLUMN_ORDER);
+                        $pmatable->removeUiProp(UiProperty::ColumnOrder);
                         break;
                     }
                 }
 
                 if ($fieldsCount !== count($colOrder)) {
-                    $pmatable->removeUiProp(Table::PROP_COLUMN_ORDER);
+                    $pmatable->removeUiProp(UiProperty::ColumnOrder);
                     $colOrder = false;
                 }
             }
 
-            $colVisib = $pmatable->getUiProp(Table::PROP_COLUMN_VISIB);
+            $colVisib = $pmatable->getUiProp(UiProperty::ColumnVisibility);
             if (is_array($colVisib) && $fieldsCount !== count($colVisib)) {
-                $pmatable->removeUiProp(Table::PROP_COLUMN_VISIB);
+                $pmatable->removeUiProp(UiProperty::ColumnVisibility);
                 $colVisib = false;
             }
         }
@@ -3142,12 +3133,12 @@ class Results
                 $afterCount,
             );
 
-            $sqlQueryMessage = Generator::getMessage($message, $this->sqlQuery, 'success');
+            $sqlQueryMessage = Generator::getMessage($message, $this->sqlQuery, MessageType::Success);
         } elseif (! $this->printView && ! $isLimitedDisplay) {
             $sqlQueryMessage = Generator::getMessage(
                 __('Your SQL query has been executed successfully.'),
                 $this->sqlQuery,
-                'success',
+                MessageType::Success,
             );
         }
 
@@ -3159,7 +3150,6 @@ class Results
             $this->table = $this->fieldsMeta[0]->table;
         }
 
-        $unsortedSqlQuery = '';
         $sortByKeyData = [];
         // can the result be sorted?
         if ($displayParts->hasSortLink && $statementInfo->statement !== null) {
@@ -3209,7 +3199,6 @@ class Results
         $headers = $this->getTableHeaders(
             $displayParts,
             $statementInfo,
-            $unsortedSqlQuery,
             $sortExpression,
             $sortExpressionNoDirection,
             $sortDirection,
@@ -3907,8 +3896,8 @@ class Results
                 }
 
                 $value .= Generator::linkOrButton(
-                    Url::getFromRoute('/sql'),
-                    $urlParams,
+                    Url::getFromRoute('/sql', $urlParams, false),
+                    null,
                     $displayedData,
                     $tagParams,
                 );

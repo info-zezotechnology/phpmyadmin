@@ -13,6 +13,7 @@ use PhpMyAdmin\DbTableExists;
 use PhpMyAdmin\FieldMetadata;
 use PhpMyAdmin\Gis\GisVisualization;
 use PhpMyAdmin\Html\Generator;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
@@ -26,6 +27,8 @@ use function __;
 use function in_array;
 use function is_array;
 use function is_string;
+use function ob_get_clean;
+use function ob_start;
 
 /**
  * Handles creation of the GIS visualizations.
@@ -37,13 +40,14 @@ final class GisVisualizationController implements InvocableController
         private readonly Template $template,
         private readonly DatabaseInterface $dbi,
         private readonly DbTableExists $dbTableExists,
+        private readonly ResponseFactory $responseFactory,
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         if (! $this->response->checkParameters(['db'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['errorUrl'] = Util::getScriptNameForOption(
@@ -58,12 +62,12 @@ final class GisVisualizationController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         // SQL query for retrieving GIS data
@@ -76,7 +80,7 @@ final class GisVisualizationController implements InvocableController
                 Message::error(__('No SQL query was set to fetch data.'))->getDisplay(),
             );
 
-            return null;
+            return $this->response->response();
         }
 
         $meta = $this->getColumnMeta($sqlQuery);
@@ -98,7 +102,7 @@ final class GisVisualizationController implements InvocableController
                 Message::error(__('No spatial column found for this SQL query.'))->getDisplay(),
             );
 
-            return null;
+            return $this->response->response();
         }
 
         // Get settings if any posted
@@ -112,11 +116,13 @@ final class GisVisualizationController implements InvocableController
         $visualization = GisVisualization::get($sqlQuery, $visualizationSettings, $rows, $pos);
 
         if (isset($_GET['saveToFile'])) {
-            $this->response->disable();
+            $response = $this->responseFactory->createResponse();
             $filename = $visualization->getSpatialColumn();
+            ob_start();
             $visualization->toFile($filename, $_GET['fileFormat']);
+            $output = ob_get_clean();
 
-            return null;
+            return $response->write((string) $output);
         }
 
         $this->response->addScriptFiles(['vendor/openlayers/OpenLayers.js', 'table/gis_visualization.js']);
@@ -158,12 +164,12 @@ final class GisVisualizationController implements InvocableController
             'start_and_number_of_rows_fieldset' => $startAndNumberOfRowsFieldset,
             'useBaseLayer' => $useBaseLayer,
             'visualization' => $visualization->asSVG(),
-            'draw_ol' => $visualization->asOl(),
+            'open_layers_data' => $visualization->asOl(),
         ]);
 
         $this->response->addHTML($html);
 
-        return null;
+        return $this->response->response();
     }
 
     /**

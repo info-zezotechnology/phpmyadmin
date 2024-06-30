@@ -13,6 +13,7 @@ use PhpMyAdmin\Current;
 use PhpMyAdmin\Encoding;
 use PhpMyAdmin\Exceptions\ExportException;
 use PhpMyAdmin\Export\Export;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
@@ -39,11 +40,14 @@ use function time;
 
 final class ExportController implements InvocableController
 {
-    public function __construct(private readonly ResponseRenderer $response, private readonly Export $export)
-    {
+    public function __construct(
+        private readonly ResponseRenderer $response,
+        private readonly Export $export,
+        private readonly ResponseFactory $responseFactory,
+    ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['export_type'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
@@ -96,7 +100,7 @@ final class ExportController implements InvocableController
         $GLOBALS['what'] = Core::securePath($whatParam);
 
         if (! $this->response->checkParameters(['what', 'export_type'])) {
-            return null;
+            return $this->response->response();
         }
 
         // export class instance, not array of properties, as before
@@ -110,7 +114,7 @@ final class ExportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addHTML(Message::error(__('Bad type!'))->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         if ($request->hasBodyParam('sql_backquotes') && $exportPlugin instanceof ExportSql) {
@@ -164,14 +168,6 @@ final class ExportController implements InvocableController
             }
         }
 
-        /**
-         * If we are sending the export file (as opposed to just displaying it
-         * as text), we have to bypass the usual PhpMyAdmin\Response mechanism
-         */
-        if ($outputFormat === 'sendit' && ! $GLOBALS['save_on_server']) {
-            $this->response->disable();
-        }
-
         $tableNames = [];
         // Generate error url and check for needed variables
         if ($GLOBALS['export_type'] === 'server') {
@@ -193,7 +189,7 @@ final class ExportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addHTML(Message::error(__('Bad parameters!'))->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         // Merge SQL Query aliases with Export aliases from
@@ -280,7 +276,7 @@ final class ExportController implements InvocableController
                 $location = $this->export->getPageLocationAndSaveMessage($GLOBALS['export_type'], $message);
                 $this->response->redirect($location);
 
-                return null;
+                return $this->response->response();
             }
         } elseif ($GLOBALS['asfile']) {
             /**
@@ -303,9 +299,8 @@ final class ExportController implements InvocableController
                     );
                     /** @var DatabaseExportController $controller */
                     $controller = ContainerBuilder::getContainer()->get(DatabaseExportController::class);
-                    $controller($request);
 
-                    return null;
+                    return $controller($request);
                 }
             }
 
@@ -491,7 +486,7 @@ final class ExportController implements InvocableController
             $location = $this->export->getPageLocationAndSaveMessage($GLOBALS['export_type'], $GLOBALS['message']);
             $this->response->redirect($location);
 
-            return null;
+            return $this->response->response();
         }
 
         /**
@@ -504,7 +499,7 @@ final class ExportController implements InvocableController
                 Current::$table,
             );
 
-            return null;
+            return $this->response->response();
         }
 
         // Convert the charset if required.
@@ -543,12 +538,10 @@ final class ExportController implements InvocableController
             $location = $this->export->getPageLocationAndSaveMessage($GLOBALS['export_type'], $message);
             $this->response->redirect($location);
 
-            return null;
+            return $this->response->response();
         }
 
-        echo $this->export->dumpBuffer;
-
-        return null;
+        return $this->responseFactory->createResponse()->write($this->export->dumpBuffer);
     }
 
     /**

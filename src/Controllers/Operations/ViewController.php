@@ -15,6 +15,7 @@ use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Url;
 use PhpMyAdmin\Util;
@@ -36,7 +37,7 @@ final class ViewController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $tableObject = $this->dbi->getTable(Current::$database, Current::$table);
@@ -45,7 +46,7 @@ final class ViewController implements InvocableController
         $this->response->addScriptFiles(['table/operations.js']);
 
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -61,12 +62,12 @@ final class ViewController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -75,18 +76,18 @@ final class ViewController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams']['goto'] = $GLOBALS['urlParams']['back'] = Url::getFromRoute('/view/operations');
 
         $message = new Message();
-        $type = 'success';
+        $type = MessageType::Success;
         $newname = $request->getParsedBodyParam('new_name');
 
         $warningMessages = [];
@@ -118,12 +119,12 @@ final class ViewController implements InvocableController
                     $message->addText(__('Error'));
                 }
 
-                $type = $result ? 'success' : 'error';
+                $type = $result ? MessageType::Success : MessageType::Error;
             }
 
             if ($warningMessages !== []) {
                 $message->addMessagesString($warningMessages);
-                $message->setType(Message::ERROR);
+                $message->setType(MessageType::Error);
             }
 
             $this->response->addHTML(Generator::getMessage(
@@ -139,6 +140,6 @@ final class ViewController implements InvocableController
             'url_params' => $GLOBALS['urlParams'],
         ]);
 
-        return null;
+        return $this->response->response();
     }
 }

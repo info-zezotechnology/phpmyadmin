@@ -28,7 +28,7 @@ final class MonitorController extends AbstractController implements InvocableCon
         parent::__construct($response, $template, $data);
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['errorUrl'] = Url::getFromRoute('/');
 
@@ -37,19 +37,11 @@ final class MonitorController extends AbstractController implements InvocableCon
         }
 
         $this->response->addScriptFiles([
+            'vendor/chart.umd.js',
+            'vendor/chartjs-adapter-date-fns.bundle.js',
             'vendor/jquery/jquery.tablesorter.js',
             'jquery.sortable-table.js',
-            'vendor/jqplot/jquery.jqplot.js',
-            'vendor/jqplot/plugins/jqplot.pieRenderer.js',
-            'vendor/jqplot/plugins/jqplot.enhancedPieLegendRenderer.js',
-            'vendor/jqplot/plugins/jqplot.canvasTextRenderer.js',
-            'vendor/jqplot/plugins/jqplot.canvasAxisLabelRenderer.js',
-            'vendor/jqplot/plugins/jqplot.dateAxisRenderer.js',
-            'vendor/jqplot/plugins/jqplot.highlighter.js',
-            'vendor/jqplot/plugins/jqplot.cursor.js',
-            'jqplot/plugins/jqplot.byteFormatter.js',
             'server/status/monitor.js',
-            'chart.js',// Needed by createProfilingChart in server/status/monitor.js
         ]);
 
         $form = [
@@ -73,6 +65,6 @@ final class MonitorController extends AbstractController implements InvocableCon
             'form' => $form,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 }

@@ -9,7 +9,6 @@ interface Window {
     zxcvbnts: any;
     msCrypto: any;
     u2f: any;
-    drawOpenLayers: () => any;
     variableNames: string[];
 
     sprintf(format: string, ...values: (string|number)[]): string;
@@ -49,6 +48,5 @@ interface JQuery {
 interface JQueryStatic {
     timepicker: any;
     tablesorter: any;
-    jqplot: any;
     uiTableFilter: any;
 }

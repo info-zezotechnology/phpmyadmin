@@ -22,6 +22,7 @@ use PhpMyAdmin\Html\MySQLDocumentation;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Query\Compatibility;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Template;
@@ -2219,7 +2220,7 @@ class Privileges
      * @param string|null         $password   password
      * @param bool                $isMenuwork is_menuwork set?
      *
-     * @return array{Message|null, string[], string[]|null, string|null, bool}
+     * @return array{Message|null, string[], string[]|null, string, bool}
      */
     public function addUser(
         string|array|null $dbname,
@@ -2231,7 +2232,7 @@ class Privileges
         $message = null;
         $queries = [];
         $queriesForDisplay = null;
-        $sqlQuery = null;
+        $sqlQuery = '';
 
         if (! isset($_POST['adduser_submit']) && ! isset($_POST['change_copy'])) {
             return [
@@ -2606,7 +2607,7 @@ class Privileges
                             . 'if they have been changed manually. In this case, '
                             . 'you should %sreload the privileges%s before you continue.',
                         ),
-                        Message::NOTICE,
+                        MessageType::Notice,
                     );
                     $flushnote->addParamHtml(
                         '<a href="' . Url::getFromRoute('/server/privileges', ['flush_privileges' => 1])
@@ -2630,7 +2631,7 @@ class Privileges
                             null,
                             'priv_reload',
                         ),
-                        Message::NOTICE,
+                        MessageType::Notice,
                     );
                 }
 

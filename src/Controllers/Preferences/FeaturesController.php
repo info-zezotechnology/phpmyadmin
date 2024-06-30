@@ -33,24 +33,23 @@ final class FeaturesController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
-        $GLOBALS['cf'] ??= null;
         $GLOBALS['error'] ??= null;
         $GLOBALS['tabHash'] ??= null;
         $GLOBALS['hash'] ??= null;
 
-        $GLOBALS['cf'] = new ConfigFile($this->config->baseSettings);
-        $this->userPreferences->pageInit($GLOBALS['cf']);
+        $configFile = new ConfigFile($this->config->baseSettings);
+        $this->userPreferences->pageInit($configFile);
 
-        $formDisplay = new FeaturesForm($GLOBALS['cf'], 1);
+        $formDisplay = new FeaturesForm($configFile, 1);
 
         if ($request->hasBodyParam('revert')) {
             // revert erroneous fields to their default values
             $formDisplay->fixErrors();
             $this->response->redirectToRoute('/preferences/features', []);
 
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['error'] = null;
@@ -58,7 +57,7 @@ final class FeaturesController implements InvocableController
             // Load 2FA settings
             $twoFactor = new TwoFactor(Config::getInstance()->selectedServer['user']);
             // save settings
-            $result = $this->userPreferences->save($GLOBALS['cf']->getConfigArray());
+            $result = $this->userPreferences->save($configFile->getConfigArray());
             // save back the 2FA setting only
             $twoFactor->save();
             if ($result === true) {
@@ -68,7 +67,7 @@ final class FeaturesController implements InvocableController
                 $GLOBALS['hash'] = ltrim($GLOBALS['tabHash'], '#');
                 $this->userPreferences->redirect('index.php?route=/preferences/features', null, $GLOBALS['hash']);
 
-                return null;
+                return $this->response->response();
             }
 
             $GLOBALS['error'] = $result;
@@ -101,6 +100,6 @@ final class FeaturesController implements InvocableController
             define('PMA_DISABLE_NAVI_SETTINGS', true);
         }
 
-        return null;
+        return $this->response->response();
     }
 }

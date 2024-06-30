@@ -17,6 +17,7 @@ use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Index;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Table\Indexes;
 use PhpMyAdmin\Template;
@@ -44,14 +45,14 @@ final class IndexesController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
 
         if (! isset($_POST['create_edit_table'])) {
             if (! $this->response->checkParameters(['db', 'table'])) {
-                return null;
+                return $this->response->response();
             }
 
             $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -67,12 +68,12 @@ final class IndexesController implements InvocableController
                     $this->response->setRequestStatus(false);
                     $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                    return null;
+                    return $this->response->response();
                 }
 
                 $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-                return null;
+                return $this->response->response();
             }
 
             $tableName = TableName::tryFrom($request->getParam('table'));
@@ -81,12 +82,12 @@ final class IndexesController implements InvocableController
                     $this->response->setRequestStatus(false);
                     $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                    return null;
+                    return $this->response->response();
                 }
 
                 $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-                return null;
+                return $this->response->response();
             }
         }
 
@@ -123,7 +124,7 @@ final class IndexesController implements InvocableController
                     $this->template->render('preview_sql', ['query_data' => $sqlQuery]),
                 );
 
-                return null;
+                return $this->response->response();
             }
 
             $logicError = $this->indexes->getError();
@@ -131,7 +132,7 @@ final class IndexesController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', $logicError);
 
-                return null;
+                return $this->response->response();
             }
 
             $this->dbi->query($sqlQuery);
@@ -143,7 +144,7 @@ final class IndexesController implements InvocableController
                 $message->addParam(Current::$table);
                 $this->response->addJSON(
                     'message',
-                    Generator::getMessage($message, $sqlQuery, 'success'),
+                    Generator::getMessage($message, $sqlQuery, MessageType::Success),
                 );
 
                 $indexes = Index::getFromTable($this->dbi, Current::$table, Current::$database);
@@ -158,19 +159,18 @@ final class IndexesController implements InvocableController
                     ]),
                 );
 
-                return null;
+                return $this->response->response();
             }
 
             /** @var StructureController $controller */
             $controller = ContainerBuilder::getContainer()->get(StructureController::class);
-            $controller($request);
 
-            return null;
+            return $controller($request);
         }
 
         $this->displayForm($index);
 
-        return null;
+        return $this->response->response();
     }
 
     /**

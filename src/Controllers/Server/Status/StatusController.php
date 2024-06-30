@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpMyAdmin\Controllers\Server\Status;
 
+use DateTimeImmutable;
 use PhpMyAdmin\Controllers\InvocableController;
 use PhpMyAdmin\DatabaseInterface;
 use PhpMyAdmin\Http\Response;
@@ -33,7 +34,7 @@ final class StatusController extends AbstractController implements InvocableCont
         parent::__construct($response, $template, $data);
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['errorUrl'] = Url::getFromRoute('/');
 
@@ -64,7 +65,7 @@ final class StatusController extends AbstractController implements InvocableCont
                 $uptime = Util::timespanFormat((int) $this->data->status['Uptime']);
             }
 
-            $startTime = Util::localisedDate($this->getStartTime());
+            $startTime = Util::localisedDate((new DateTimeImmutable())->setTimestamp($this->getStartTime()));
 
             $traffic = $this->getTrafficInfo();
 
@@ -92,7 +93,7 @@ final class StatusController extends AbstractController implements InvocableCont
             'replication' => $replication,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 
     private function getStartTime(): int

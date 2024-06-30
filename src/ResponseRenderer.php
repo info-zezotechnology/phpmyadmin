@@ -29,10 +29,6 @@ class ResponseRenderer
     private static ResponseRenderer|null $instance = null;
 
     /**
-     * Header instance
-     */
-    protected Header $header;
-    /**
      * HTML data to be used in the response
      */
     private string $HTML = '';
@@ -43,18 +39,11 @@ class ResponseRenderer
      * @var mixed[]
      */
     private array $JSON = [];
-    /**
-     * PhpMyAdmin\Footer instance
-     */
-    protected Footer $footer;
+
     /**
      * Whether we are servicing an ajax request.
      */
     protected bool $isAjax = false;
-    /**
-     * Whether response object is disabled
-     */
-    protected bool $isDisabled = false;
     /**
      * Whether there were any errors during the processing of the request
      * Only used for ajax responses
@@ -140,24 +129,16 @@ class ResponseRenderer
 
     protected Response $response;
 
-    protected Template $template;
-    protected Config $config;
-
-    private function __construct()
-    {
-        $this->config = Config::getInstance();
-        $this->template = new Template();
-        $dbi = DatabaseInterface::getInstance();
-        $relation = new Relation($dbi);
-        $this->header = new Header(
-            $this->template,
-            new Console($relation, $this->template, new BookmarkRepository($dbi, $relation)),
-            $this->config,
-        );
-        $this->footer = new Footer($this->template, $this->config);
-        $this->response = ResponseFactory::create()->createResponse();
-
-        $this->setAjax(! empty($_REQUEST['ajax_request']));
+    protected function __construct(
+        protected Config $config,
+        protected Template $template,
+        protected Header $header,
+        protected Footer $footer,
+        protected ErrorHandler $errorHandler,
+        protected DatabaseInterface $dbi,
+        ResponseFactory $responseFactory,
+    ) {
+        $this->response = $responseFactory->createResponse(StatusCodeInterface::STATUS_OK, 'OK');
     }
 
     /**
@@ -169,8 +150,6 @@ class ResponseRenderer
     public function setAjax(bool $isAjax): void
     {
         $this->isAjax = $isAjax;
-        $this->header->setAjax($this->isAjax);
-        $this->footer->setAjax($this->isAjax);
     }
 
     /**
@@ -178,9 +157,25 @@ class ResponseRenderer
      */
     public static function getInstance(): ResponseRenderer
     {
-        if (self::$instance === null) {
-            self::$instance = new ResponseRenderer();
+        if (self::$instance !== null) {
+            return self::$instance;
         }
+
+        $config = Config::getInstance();
+        $template = new Template($config);
+        $dbi = DatabaseInterface::getInstance();
+        $relation = new Relation($dbi);
+        $console = new Console($relation, $template, new BookmarkRepository($dbi, $relation));
+
+        self::$instance = new ResponseRenderer(
+            $config,
+            $template,
+            new Header($template, $console, $config),
+            new Footer($template, $config),
+            ErrorHandler::getInstance(),
+            $dbi,
+            ResponseFactory::create(),
+        );
 
         return self::$instance;
     }
@@ -203,17 +198,6 @@ class ResponseRenderer
     public function isAjax(): bool
     {
         return $this->isAjax;
-    }
-
-    /**
-     * Disables the rendering of the header
-     * and the footer in responses
-     */
-    public function disable(): void
-    {
-        $this->header->disable();
-        $this->footer->disable();
-        $this->isDisabled = true;
     }
 
     /**
@@ -257,10 +241,6 @@ class ResponseRenderer
      */
     private function getDisplay(): string
     {
-        // The header may contain nothing at all,
-        // if its content was already rendered
-        // and, in this case, the header will be
-        // in the content part of the request
         return $this->template->render('base', [
             'header' => $this->header->getDisplay(),
             'content' => $this->HTML,
@@ -273,13 +253,8 @@ class ResponseRenderer
      */
     private function ajaxResponse(): string
     {
-        /* Avoid wrapping in case we're disabled */
-        if ($this->isDisabled) {
-            return $this->getDisplay();
-        }
-
         if (! isset($this->JSON['message'])) {
-            $this->JSON['message'] = $this->getDisplay();
+            $this->JSON['message'] = $this->HTML;
         } elseif ($this->JSON['message'] instanceof Message) {
             $this->JSON['message'] = $this->JSON['message']->getDisplay();
         }
@@ -297,7 +272,7 @@ class ResponseRenderer
                 $this->addJSON('title', '<title>' . $this->getHeader()->getPageTitle() . '</title>');
             }
 
-            if (DatabaseInterface::getInstance()->isConnected()) {
+            if ($this->dbi->isConnected()) {
                 $this->addJSON('menu', $this->getHeader()->getMenu()->getDisplay());
             }
 
@@ -315,7 +290,7 @@ class ResponseRenderer
                 $this->addJSON('errors', $errors);
             }
 
-            $promptPhpErrors = ErrorHandler::getInstance()->hasErrorsForPrompt();
+            $promptPhpErrors = $this->errorHandler->hasErrorsForPrompt();
             $this->addJSON('promptPhpErrors', $promptPhpErrors);
 
             if (empty($GLOBALS['error_message'])) {
@@ -343,12 +318,6 @@ class ResponseRenderer
             }
         }
 
-        // Set the Content-Type header to JSON so that jQuery parses the
-        // response correctly.
-        foreach (Core::headerJSON() as $name => $value) {
-            $this->addHeader($name, $value);
-        }
-
         $result = json_encode($this->JSON);
         if ($result === false) {
             return (string) json_encode([
@@ -362,9 +331,19 @@ class ResponseRenderer
 
     public function response(): Response
     {
-        $this->response->getBody()->write($this->isAjax() ? $this->ajaxResponse() : $this->getDisplay());
+        if ($this->isAjax()) {
+            $headers = Core::headerJSON();
+            $body = $this->ajaxResponse();
+        } else {
+            $headers = $this->header->getHttpHeaders();
+            $body = $this->getDisplay();
+        }
 
-        return $this->response;
+        foreach ($headers as $name => $value) {
+            $this->response = $this->response->withHeader($name, $value);
+        }
+
+        return $this->response->write($body);
     }
 
     public function addHeader(string $name, string $value): void
@@ -429,20 +408,25 @@ class ResponseRenderer
     }
 
     /**
+     * Avoid relative path redirect problems in case user entered URL
+     * like /phpmyadmin/index.php/ which some web servers happily accept.
+     */
+    public function fixRelativeUrlForRedirect(string $url): string
+    {
+        if (! str_starts_with($url, '.')) {
+            return $url;
+        }
+
+        return $this->config->getRootPath() . substr($url, 2);
+    }
+
+    /**
      * @psalm-param non-empty-string $url
      * @psalm-param StatusCodeInterface::STATUS_* $statusCode
      */
     public function redirect(string $url, int $statusCode = StatusCodeInterface::STATUS_FOUND): void
     {
-        /**
-         * Avoid relative path redirect problems in case user entered URL
-         * like /phpmyadmin/index.php/ which some web servers happily accept.
-         */
-        if (str_starts_with($url, '.')) {
-            $url = $this->config->getRootPath() . substr($url, 2);
-        }
-
-        $this->addHeader('Location', $url);
+        $this->addHeader('Location', $this->fixRelativeUrlForRedirect($url));
         $this->setStatusCode($statusCode);
     }
 

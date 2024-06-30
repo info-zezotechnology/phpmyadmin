@@ -14,6 +14,7 @@ use PhpMyAdmin\Html\Generator;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Partitioning\TablePartitionDefinition;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\SqlParser\Parser;
@@ -40,14 +41,13 @@ final class PartitioningController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         if (isset($_POST['save_partitioning'])) {
             $this->dbi->selectDb(Current::$database);
             $this->updatePartitioning();
-            ($this->structureController)($request);
 
-            return null;
+            return ($this->structureController)($request);
         }
 
         $this->pageSettings->init('TableStructure');
@@ -74,7 +74,7 @@ final class PartitioningController implements InvocableController
             'storage_engines' => $storageEngines,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 
     /**
@@ -266,7 +266,7 @@ final class PartitioningController implements InvocableController
         );
         $message->addParam(Current::$table);
         $this->response->addHTML(
-            Generator::getMessage($message, $sqlQuery, 'success'),
+            Generator::getMessage($message, $sqlQuery, MessageType::Success),
         );
     }
 }

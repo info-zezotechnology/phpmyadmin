@@ -15,6 +15,7 @@ use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Template;
 use PhpMyAdmin\Url;
@@ -51,12 +52,12 @@ final class FindReplaceController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -72,12 +73,12 @@ final class FindReplaceController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -86,12 +87,12 @@ final class FindReplaceController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $this->loadTableInfo();
@@ -106,7 +107,7 @@ final class FindReplaceController implements InvocableController
             $preview = $this->getReplacePreview($columnIndex, $find, $replaceWith, $useRegex, $connectionCharSet);
             $this->response->addJSON('preview', $preview);
 
-            return null;
+            return $this->response->response();
         }
 
         $this->response->addScriptFiles(['table/find_replace.js']);
@@ -118,7 +119,7 @@ final class FindReplaceController implements InvocableController
                 Generator::getMessage(
                     __('Your SQL query has been executed successfully.'),
                     null,
-                    'success',
+                    MessageType::Success,
                 ),
             );
         }
@@ -126,7 +127,7 @@ final class FindReplaceController implements InvocableController
         // Displays the find and replace form
         $this->displaySelectionFormAction();
 
-        return null;
+        return $this->response->response();
     }
 
     /**

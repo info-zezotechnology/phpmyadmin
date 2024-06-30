@@ -22,6 +22,7 @@ use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\LanguageManager;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Server\Select;
 use PhpMyAdmin\Theme\ThemeManager;
@@ -58,7 +59,7 @@ final class HomeController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         if ($this->shouldRedirectToDatabaseOrTablePage($request)) {
             return $this->redirectToDatabaseOrTablePage($request);
@@ -69,7 +70,7 @@ final class HomeController implements InvocableController
         $GLOBALS['errorUrl'] ??= null;
 
         if ($request->isAjax() && ! empty($_REQUEST['access_time'])) {
-            return null;
+            return $this->response->response();
         }
 
         $this->response->addScriptFiles(['home.js']);
@@ -108,9 +109,13 @@ final class HomeController implements InvocableController
         $hasServer = Current::$server > 0 || count($config->settings['Servers']) > 1;
         if ($hasServer) {
             $hasServerSelection = $config->settings['ServerDefault'] == 0
-                || (! $config->settings['NavigationDisplayServers']
-                && (count($config->settings['Servers']) > 1
-                || (Current::$server === 0 && count($config->settings['Servers']) === 1)));
+                || (
+                    $config->settings['NavigationDisplayServers']
+                    && (
+                        count($config->settings['Servers']) > 1
+                        || (Current::$server === 0 && count($config->settings['Servers']) === 1)
+                    )
+                );
             if ($hasServerSelection) {
                 $serverSelection = Select::render(true);
             }
@@ -206,7 +211,7 @@ final class HomeController implements InvocableController
                 $messageInstance->addParamHtml('</a>');
                 /* Show error if user has configured something, notice elsewhere */
                 if (! empty($config->settings['Servers'][Current::$server]['pmadb'])) {
-                    $messageInstance->setType(Message::ERROR);
+                    $messageInstance->setType(MessageType::Error);
                 }
 
                 $configStorageMessage = $messageInstance->getDisplay();
@@ -245,7 +250,7 @@ final class HomeController implements InvocableController
             'errors' => $this->errors,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 
     private function checkRequirements(): void

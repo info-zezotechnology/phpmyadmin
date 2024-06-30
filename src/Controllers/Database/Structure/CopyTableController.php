@@ -11,7 +11,9 @@ use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Message;
 use PhpMyAdmin\Operations;
-use PhpMyAdmin\Table\Table;
+use PhpMyAdmin\Table\MoveMode;
+use PhpMyAdmin\Table\MoveScope;
+use PhpMyAdmin\Table\TableMover;
 use PhpMyAdmin\UserPrivilegesFactory;
 
 final class CopyTableController implements InvocableController
@@ -20,10 +22,11 @@ final class CopyTableController implements InvocableController
         private readonly Operations $operations,
         private readonly StructureController $structureController,
         private readonly UserPrivilegesFactory $userPrivilegesFactory,
+        private readonly TableMover $tableMover,
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         /** @var string[] $selected */
         $selected = $request->getParsedBodyParam('selected', []);
@@ -33,14 +36,13 @@ final class CopyTableController implements InvocableController
         $userPrivileges = $this->userPrivilegesFactory->getPrivileges();
 
         foreach ($selected as $selectedValue) {
-            Table::moveCopy(
+            $this->tableMover->moveCopy(
                 Current::$database,
                 $selectedValue,
                 $targetDb,
                 $selectedValue,
-                $request->getParsedBodyParam('what'),
-                false,
-                'one_table',
+                MoveScope::from($request->getParsedBodyParam('what')),
+                MoveMode::SingleTable,
                 $request->getParsedBodyParam('drop_if_exists') === 'true',
             );
 
@@ -59,8 +61,6 @@ final class CopyTableController implements InvocableController
 
         $GLOBALS['message'] = Message::success();
 
-        ($this->structureController)($request);
-
-        return null;
+        return ($this->structureController)($request);
     }
 }

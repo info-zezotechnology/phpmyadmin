@@ -16,6 +16,7 @@ use PhpMyAdmin\Html\Generator;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Index;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Table\Table;
 use PhpMyAdmin\Template;
@@ -50,7 +51,7 @@ final class RelationController implements InvocableController
     /**
      * Index
      */
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $options = [
             'CASCADE' => 'CASCADE',
@@ -84,7 +85,7 @@ final class RelationController implements InvocableController
                 $this->getDropdownValueForDatabase($storageEngine);
             }
 
-            return null;
+            return $this->response->response();
         }
 
         $this->response->addScriptFiles(['table/relation.js']);
@@ -130,7 +131,7 @@ final class RelationController implements InvocableController
         if (isset($_POST['preview_sql'])) {
             Core::previewSQL($previewSqlData);
 
-            return null;
+            return $this->response->response();
         }
 
         if ($displayQuery !== '' && ! $seenError) {
@@ -139,7 +140,7 @@ final class RelationController implements InvocableController
                 Generator::getMessage(
                     __('Your SQL query has been executed successfully.'),
                     null,
-                    'success',
+                    MessageType::Success,
                 ),
             );
         }
@@ -310,7 +311,7 @@ final class RelationController implements InvocableController
             'foreign_key_row' => $foreignKeyRow,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 
     /**
@@ -324,7 +325,7 @@ final class RelationController implements InvocableController
             Generator::getMessage(
                 __('Display column was successfully updated.'),
                 '',
-                'success',
+                MessageType::Success,
             ),
         );
     }
@@ -358,7 +359,7 @@ final class RelationController implements InvocableController
             Generator::getMessage(
                 __('Internal relationships were successfully updated.'),
                 '',
-                'success',
+                MessageType::Success,
             ),
         );
     }

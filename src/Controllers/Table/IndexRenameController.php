@@ -16,6 +16,7 @@ use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Index;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Table\Indexes;
 use PhpMyAdmin\Template;
@@ -35,13 +36,13 @@ final class IndexRenameController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
 
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -57,12 +58,12 @@ final class IndexRenameController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -71,12 +72,12 @@ final class IndexRenameController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $oldIndexName = $request->getParsedBodyParam('old_index');
@@ -92,7 +93,7 @@ final class IndexRenameController implements InvocableController
 
             $this->response->render('table/index_rename_form', ['index' => $index, 'form_params' => $formParams]);
 
-            return null;
+            return $this->response->response();
         }
 
         // coming already from form
@@ -114,7 +115,7 @@ final class IndexRenameController implements InvocableController
                 $this->template->render('preview_sql', ['query_data' => $sqlQuery]),
             );
 
-            return null;
+            return $this->response->response();
         }
 
         $logicError = $this->indexes->getError();
@@ -122,7 +123,7 @@ final class IndexRenameController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addJSON('message', $logicError);
 
-            return null;
+            return $this->response->response();
         }
 
         $this->dbi->query($sqlQuery);
@@ -131,7 +132,7 @@ final class IndexRenameController implements InvocableController
         $message->addParam($tableName->getName());
         $this->response->addJSON(
             'message',
-            Generator::getMessage($message, $sqlQuery, 'success'),
+            Generator::getMessage($message, $sqlQuery, MessageType::Success),
         );
 
         $indexes = Index::getFromTable($this->dbi, $tableName->getName(), $databaseName->getName());
@@ -146,6 +147,6 @@ final class IndexRenameController implements InvocableController
             ]),
         );
 
-        return null;
+        return $this->response->response();
     }
 }

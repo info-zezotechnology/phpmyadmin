@@ -8,6 +8,7 @@ use PhpMyAdmin\Core;
 use PhpMyAdmin\Exceptions\ExportException;
 use PhpMyAdmin\Export\Export;
 use PhpMyAdmin\Html\MySQLDocumentation;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
@@ -23,11 +24,14 @@ use function mb_strlen;
  */
 final class SchemaExportController implements InvocableController
 {
-    public function __construct(private readonly Export $export, private readonly ResponseRenderer $response)
-    {
+    public function __construct(
+        private readonly Export $export,
+        private readonly ResponseRenderer $response,
+        private readonly ResponseFactory $responseFactory,
+    ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $db = DatabaseName::tryFrom($request->getParsedBodyParam('db'));
         /** @var mixed $exportType */
@@ -39,7 +43,7 @@ final class SchemaExportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addHTML(Message::error($errorMessage)->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         /**
@@ -51,17 +55,16 @@ final class SchemaExportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addHTML(Message::error($exception->getMessage())->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
-        $this->response->disable();
+        $response = $this->responseFactory->createResponse();
         Core::downloadHeader(
             $exportInfo['fileName'],
             $exportInfo['mediaType'],
             mb_strlen($exportInfo['fileData'], '8bit'),
         );
-        echo $exportInfo['fileData'];
 
-        return null;
+        return $response->write($exportInfo['fileData']);
     }
 }

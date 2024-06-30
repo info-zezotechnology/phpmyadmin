@@ -10,13 +10,15 @@ use PhpMyAdmin\Controllers\InvocableController;
 use PhpMyAdmin\Core;
 use PhpMyAdmin\Current;
 use PhpMyAdmin\DbTableExists;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\LanguageManager;
 use PhpMyAdmin\Message;
 use PhpMyAdmin\ResponseRenderer;
-use PhpMyAdmin\Tracking\LogTypeEnum;
+use PhpMyAdmin\Tracking\LogType;
+use PhpMyAdmin\Tracking\TrackedDataType;
 use PhpMyAdmin\Tracking\Tracker;
 use PhpMyAdmin\Tracking\Tracking;
 use PhpMyAdmin\Tracking\TrackingChecker;
@@ -29,7 +31,6 @@ use function __;
 use function array_map;
 use function explode;
 use function htmlspecialchars;
-use function in_array;
 use function is_array;
 use function mb_strlen;
 use function sprintf;
@@ -42,10 +43,11 @@ final class TrackingController implements InvocableController
         private readonly Tracking $tracking,
         private readonly TrackingChecker $trackingChecker,
         private readonly DbTableExists $dbTableExists,
+        private readonly ResponseFactory $responseFactory,
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
@@ -53,7 +55,7 @@ final class TrackingController implements InvocableController
         $this->response->addScriptFiles(['vendor/jquery/jquery.tablesorter.js', 'table/tracking.js']);
 
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -69,12 +71,12 @@ final class TrackingController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $activeMessage = '';
@@ -105,7 +107,7 @@ final class TrackingController implements InvocableController
         /** @var string $tableParam */
         $tableParam = $request->getParsedBodyParam('table');
 
-        $logType = $this->validateLogTypeParam($request->getParsedBodyParam('log_type'));
+        $logType = LogType::tryFrom((string) $request->getParsedBodyParam('log_type')) ?? LogType::SchemaAndData;
 
         $message = '';
         $sqlDump = '';
@@ -138,11 +140,10 @@ final class TrackingController implements InvocableController
                 // Export as file download
                 if ($reportExportType === 'sqldumpfile') {
                     $downloadInfo = $this->tracking->getDownloadInfoForExport($tableParam, $entries);
-                    $this->response->disable();
+                    $response = $this->responseFactory->createResponse();
                     Core::downloadHeader($downloadInfo['filename'], 'text/x-sql', mb_strlen($downloadInfo['dump']));
-                    echo $downloadInfo['dump'];
 
-                    return null;
+                    return $response->write($downloadInfo['dump']);
                 }
 
                 // Export as SQL execution
@@ -161,7 +162,7 @@ final class TrackingController implements InvocableController
                     Current::$table,
                     $versionParam,
                     $trackedData->ddlog,
-                    LogTypeEnum::DDL,
+                    TrackedDataType::DDL,
                     (int) $request->getParsedBodyParam('delete_ddlog'),
                 );
                 // After deletion reload data from the database
@@ -172,7 +173,7 @@ final class TrackingController implements InvocableController
                     Current::$table,
                     $versionParam,
                     $trackedData->dmlog,
-                    LogTypeEnum::DML,
+                    TrackedDataType::DML,
                     (int) $request->getParsedBodyParam('delete_dmlog'),
                 );
                 // After deletion reload data from the database
@@ -269,13 +270,7 @@ final class TrackingController implements InvocableController
             'main' => $main,
         ]);
 
-        return null;
-    }
-
-    /** @psalm-return 'schema'|'data'|'schema_and_data' */
-    private function validateLogTypeParam(mixed $param): string
-    {
-        return in_array($param, ['schema', 'data'], true) ? $param : 'schema_and_data';
+        return $this->response->response();
     }
 
     private function validateDateTimeParam(mixed $param): DateTimeImmutable

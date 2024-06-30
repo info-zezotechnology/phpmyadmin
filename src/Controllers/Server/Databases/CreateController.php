@@ -13,6 +13,7 @@ use PhpMyAdmin\Html\Generator;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ResponseRenderer;
 use PhpMyAdmin\Url;
 use PhpMyAdmin\Util;
@@ -30,7 +31,7 @@ final class CreateController implements InvocableController
     {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $newDb = $request->getParsedBodyParam('new_db');
         $dbCollation = $request->getParsedBodyParam('db_collation');
@@ -38,7 +39,7 @@ final class CreateController implements InvocableController
         if (! is_string($newDb) || $newDb === '' || ! $request->isAjax()) {
             $this->response->addJSON(['message' => Message::error()]);
 
-            return null;
+            return $this->response->response();
         }
 
         if ($this->dbi->getLowerCaseNames() === 1) {
@@ -85,7 +86,7 @@ final class CreateController implements InvocableController
 
             $json = [
                 'message' => $message,
-                'sql_query' => Generator::getMessage('', $sqlQuery, 'success'),
+                'sql_query' => Generator::getMessage('', $sqlQuery, MessageType::Success),
                 'url' => $scriptName . Url::getCommon(
                     ['db' => $newDb],
                     ! str_contains($scriptName, '?') ? '?' : '&',
@@ -95,6 +96,6 @@ final class CreateController implements InvocableController
 
         $this->response->addJSON($json);
 
-        return null;
+        return $this->response->response();
     }
 }

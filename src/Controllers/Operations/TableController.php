@@ -18,6 +18,7 @@ use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Index;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Operations;
 use PhpMyAdmin\Partitioning\Partition;
 use PhpMyAdmin\Query\Generator as QueryGenerator;
@@ -51,7 +52,7 @@ final class TableController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['auto_increment'] ??= null;
@@ -69,7 +70,7 @@ final class TableController implements InvocableController
         $this->response->addScriptFiles(['table/operations.js']);
 
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $isSystemSchema = Utilities::isSystemSchema(Current::$database);
@@ -84,12 +85,12 @@ final class TableController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -98,12 +99,12 @@ final class TableController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams']['goto'] = $GLOBALS['urlParams']['back'] = Url::getFromRoute('/table/operations');
@@ -153,7 +154,7 @@ final class TableController implements InvocableController
             $message = $this->operations->moveOrCopyTable($userPrivileges, Current::$database, Current::$table);
 
             if (! $request->isAjax()) {
-                return null;
+                return $this->response->response();
             }
 
             $this->response->addJSON('message', $message);
@@ -167,12 +168,12 @@ final class TableController implements InvocableController
 
                 $this->response->addJSON('db', Current::$database);
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->setRequestStatus(false);
 
-            return null;
+            return $this->response->response();
         }
 
         $newMessage = '';
@@ -276,7 +277,7 @@ final class TableController implements InvocableController
                         Message::error(__('No collation provided.')),
                     );
 
-                    return null;
+                    return $this->response->response();
                 }
             }
         }
@@ -360,7 +361,7 @@ final class TableController implements InvocableController
                         );
                     }
 
-                    return null;
+                    return $this->response->response();
                 }
             } else {
                 $newMessage = $result
@@ -371,7 +372,7 @@ final class TableController implements InvocableController
             if ($warningMessages !== []) {
                 $newMessage = new Message();
                 $newMessage->addMessagesString($warningMessages);
-                $newMessage->setType(Message::ERROR);
+                $newMessage->setType(MessageType::Error);
                 if ($request->isAjax()) {
                     $this->response->setRequestStatus(false);
                     $this->response->addJSON('message', $newMessage);
@@ -382,7 +383,7 @@ final class TableController implements InvocableController
                         );
                     }
 
-                    return null;
+                    return $this->response->response();
                 }
             }
 
@@ -520,6 +521,6 @@ final class TableController implements InvocableController
             'foreigners' => $foreigners,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 }

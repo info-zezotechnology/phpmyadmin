@@ -12,9 +12,10 @@ use PhpMyAdmin\Current;
 use PhpMyAdmin\DatabaseInterface;
 use PhpMyAdmin\Encoding;
 use PhpMyAdmin\Exceptions\ExportException;
-use PhpMyAdmin\FlashMessages;
+use PhpMyAdmin\FlashMessenger;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Plugins;
 use PhpMyAdmin\Plugins\ExportPlugin;
 use PhpMyAdmin\Plugins\SchemaPlugin;
@@ -275,7 +276,7 @@ class Export
         // Some memory is needed for compression, assume 1/3
         $memoryLimit /= 8;
 
-        return $memoryLimit;
+        return (int) $memoryLimit;
     }
 
     /**
@@ -437,14 +438,14 @@ class Export
         if ($dumpBuffer !== '' && $writeResult !== strlen($dumpBuffer)) {
             return new Message(
                 __('Insufficient space to save the file %s.'),
-                Message::ERROR,
+                MessageType::Error,
                 [$saveFilename],
             );
         }
 
         return new Message(
             __('Dump has been saved to file %s.'),
-            Message::SUCCESS,
+            MessageType::Success,
             [$saveFilename],
         );
     }
@@ -1044,7 +1045,7 @@ class Export
      */
     public function getPageLocationAndSaveMessage(string $exportType, Message $message): string
     {
-        (new FlashMessages())->addMessage($message->isError() ? 'danger' : 'success', $message->getMessage());
+        (new FlashMessenger())->addMessage($message->isError() ? 'danger' : 'success', $message->getMessage());
 
         if ($exportType === 'server') {
             return 'index.php?route=/server/export' . Url::getCommonRaw([], '&');

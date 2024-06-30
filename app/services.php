@@ -24,7 +24,7 @@ use PhpMyAdmin\Export\Export;
 use PhpMyAdmin\Export\Options;
 use PhpMyAdmin\Export\TemplateModel;
 use PhpMyAdmin\FileListing;
-use PhpMyAdmin\FlashMessages;
+use PhpMyAdmin\FlashMessenger;
 use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Import\Import;
 use PhpMyAdmin\Import\SimulateDml;
@@ -48,6 +48,7 @@ use PhpMyAdmin\SqlQueryForm;
 use PhpMyAdmin\Table\ColumnsDefinition;
 use PhpMyAdmin\Table\Indexes;
 use PhpMyAdmin\Table\Search;
+use PhpMyAdmin\Table\TableMover;
 use PhpMyAdmin\Template;
 use PhpMyAdmin\Theme\ThemeManager;
 use PhpMyAdmin\Tracking\Tracking;
@@ -108,7 +109,7 @@ return [
         'export_template_model' => ['class' => TemplateModel::class, 'arguments' => ['@dbi']],
         'expression_language' => ['class' => ExpressionLanguage::class],
         'file_listing' => ['class' => FileListing::class],
-        'flash' => ['class' => FlashMessages::class],
+        FlashMessenger::class => ['class' => FlashMessenger::class],
         'http_request' => ['class' => HttpRequest::class],
         ResponseFactory::class => [
             'class' => ResponseFactory::class,
@@ -135,7 +136,7 @@ return [
         ],
         'operations' => [
             'class' => Operations::class,
-            'arguments' => ['$dbi' => '@dbi', '$relation' => '@relation'],
+            'arguments' => ['$dbi' => '@dbi', '$relation' => '@relation', '$tableMover' => '@table_mover'],
         ],
         'partitioning_maintenance' => [
             'class' => Maintenance::class,
@@ -222,9 +223,9 @@ return [
         UserPrivilegesFactory::class => ['class' => UserPrivilegesFactory::class, 'arguments' => ['@dbi']],
         'version_information' => ['class' => VersionInformation::class],
         DatabaseInterface::class => 'dbi',
-        PhpMyAdmin\FlashMessages::class => 'flash',
         PhpMyAdmin\ResponseRenderer::class => 'response',
         'bookmarkRepository' => ['class' => BookmarkRepository::class, 'arguments' => ['@dbi', '@relation']],
         'console' => ['class' => Console::class, 'arguments' => [ '@relation', '@template', '@bookmarkRepository']],
+        'table_mover' => ['class' => TableMover::class, 'arguments' => ['@dbi', '@relation']],
     ],
 ];

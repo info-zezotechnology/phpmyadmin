@@ -25,6 +25,7 @@ use PhpMyAdmin\Util;
 use PhpMyAdmin\Utils\Gis;
 
 use function __;
+use function array_map;
 use function array_search;
 use function array_values;
 use function htmlspecialchars;
@@ -78,13 +79,13 @@ final class ZoomSearchController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['goto'] ??= null;
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams'] = ['db' => Current::$database, 'table' => Current::$table];
@@ -98,12 +99,12 @@ final class ZoomSearchController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -112,26 +113,23 @@ final class ZoomSearchController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $this->loadTableInfo();
 
         $this->response->addScriptFiles([
+            'vendor/chart.umd.js',
+            'vendor/hammer.js',
+            'vendor/chartjs-plugin-zoom.js',
             'makegrid.js',
             'sql.js',
-            'vendor/jqplot/jquery.jqplot.js',
-            'vendor/jqplot/plugins/jqplot.canvasTextRenderer.js',
-            'vendor/jqplot/plugins/jqplot.canvasAxisLabelRenderer.js',
-            'vendor/jqplot/plugins/jqplot.dateAxisRenderer.js',
-            'vendor/jqplot/plugins/jqplot.highlighter.js',
-            'vendor/jqplot/plugins/jqplot.cursor.js',
-            'table/zoom_plot_jqplot.js',
+            'table/zoom_search.js',
             'table/select.js',
             'table/change.js',
             'gis_data_editor.js',
@@ -143,7 +141,7 @@ final class ZoomSearchController implements InvocableController
         if (isset($_POST['get_data_row']) && $_POST['get_data_row'] == true) {
             $this->getDataRowAction();
 
-            return null;
+            return $this->response->response();
         }
 
         /**
@@ -153,7 +151,7 @@ final class ZoomSearchController implements InvocableController
         if ($request->hasBodyParam('change_tbl_info')) {
             $this->changeTableInfoAction();
 
-            return null;
+            return $this->response->response();
         }
 
         //Set default datalabel if not selected
@@ -176,7 +174,7 @@ final class ZoomSearchController implements InvocableController
             || $_POST['criteriaColumnNames'][1] === 'pma_null'
             || $_POST['criteriaColumnNames'][0] == $_POST['criteriaColumnNames'][1]
         ) {
-            return null;
+            return $this->response->response();
         }
 
         if (! isset($GLOBALS['goto'])) {
@@ -185,7 +183,7 @@ final class ZoomSearchController implements InvocableController
 
         $this->zoomSubmitAction($dataLabel, $GLOBALS['goto']);
 
-        return null;
+        return $this->response->response();
     }
 
     /**
@@ -414,6 +412,16 @@ final class ZoomSearchController implements InvocableController
             );
         }
 
+        $integerTypes = $this->dbi->types->getIntegerTypes();
+        $floatTypes = $this->dbi->types->getFloatTypes();
+        $columnDataTypes = array_map(static function (string $type) use ($integerTypes, $floatTypes): string {
+            $cleanType = (string) preg_replace('@\(.*@s', '', $type);
+            $isInteger = in_array($cleanType, $integerTypes, true);
+            $isFloat = in_array($cleanType, $floatTypes, true);
+
+            return $isInteger ? 'INT' : ($isFloat ? 'FLOAT' : strtoupper($cleanType));
+        }, $this->columnTypes);
+
         $this->response->render('table/zoom_search/result_form', [
             'db' => Current::$database,
             'table' => Current::$table,
@@ -422,6 +430,7 @@ final class ZoomSearchController implements InvocableController
             'foreigners' => $this->foreigners,
             'column_null_flags' => $this->columnNullFlags,
             'column_types' => $this->columnTypes,
+            'column_data_types' => $columnDataTypes,
             'goto' => $goto,
             'data' => $data,
             'data_json' => json_encode($data),

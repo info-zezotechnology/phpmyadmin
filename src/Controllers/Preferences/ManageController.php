@@ -11,6 +11,7 @@ use PhpMyAdmin\ConfigStorage\Relation;
 use PhpMyAdmin\Controllers\InvocableController;
 use PhpMyAdmin\Core;
 use PhpMyAdmin\File;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Message;
@@ -51,47 +52,47 @@ final class ManageController implements InvocableController
         private readonly Relation $relation,
         private readonly Config $config,
         private readonly ThemeManager $themeManager,
+        private readonly ResponseFactory $responseFactory,
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
-        $GLOBALS['cf'] ??= null;
         $GLOBALS['error'] ??= null;
         $GLOBALS['lang'] ??= null;
         $GLOBALS['query'] ??= null;
 
         $route = $request->getRoute();
 
-        $GLOBALS['cf'] = new ConfigFile($this->config->baseSettings);
-        $this->userPreferences->pageInit($GLOBALS['cf']);
+        $configFile = new ConfigFile($this->config->baseSettings);
+        $this->userPreferences->pageInit($configFile);
 
         $GLOBALS['error'] = '';
         if ($request->hasBodyParam('submit_export') && $request->getParsedBodyParam('export_type') === 'text_file') {
             // export to JSON file
-            $this->response->disable();
+            $response = $this->responseFactory->createResponse();
             $filename = 'phpMyAdmin-config-' . urlencode(Core::getEnv('HTTP_HOST')) . '.json';
             Core::downloadHeader($filename, 'application/json');
             $settings = $this->userPreferences->load();
-            echo json_encode($settings['config_data'], JSON_PRETTY_PRINT);
 
-            return null;
+            return $response->write((string) json_encode($settings['config_data'], JSON_PRETTY_PRINT));
         }
 
         if ($request->hasBodyParam('submit_export') && $request->getParsedBodyParam('export_type') === 'php_file') {
-            // export to JSON file
-            $this->response->disable();
+            // export to PHP file
+            $response = $this->responseFactory->createResponse();
             $filename = 'phpMyAdmin-config-' . urlencode(Core::getEnv('HTTP_HOST')) . '.php';
             Core::downloadHeader($filename, 'application/php');
             $settings = $this->userPreferences->load();
-            echo '/* ' . __('phpMyAdmin configuration snippet') . " */\n\n";
-            echo '/* ' . __('Paste it to your config.inc.php') . " */\n\n";
+
+            $output = '/* ' . __('phpMyAdmin configuration snippet') . " */\n\n";
+            $output .= '/* ' . __('Paste it to your config.inc.php') . " */\n\n";
             foreach ($settings['config_data'] as $key => $val) {
-                echo '$cfg[\'' . str_replace('/', '\'][\'', $key) . '\'] = ';
-                echo var_export($val, true) . ";\n";
+                $output .= '$cfg[\'' . str_replace('/', '\'][\'', $key) . '\'] = ';
+                $output .= var_export($val, true) . ";\n";
             }
 
-            return null;
+            return $response->write($output);
         }
 
         if ($request->hasBodyParam('submit_get_json')) {
@@ -99,7 +100,7 @@ final class ManageController implements InvocableController
             $this->response->addJSON('prefs', json_encode($settings['config_data']));
             $this->response->addJSON('mtime', $settings['mtime']);
 
-            return null;
+            return $this->response->response();
         }
 
         if ($request->hasBodyParam('submit_import')) {
@@ -140,10 +141,10 @@ final class ManageController implements InvocableController
             } else {
                 // sanitize input values: treat them as though
                 // they came from HTTP POST request
-                $formDisplay = new UserFormList($GLOBALS['cf']);
-                $newConfig = $GLOBALS['cf']->getFlatDefaultConfig();
+                $formDisplay = new UserFormList($configFile);
+                $newConfig = $configFile->getFlatDefaultConfig();
                 if ($request->hasBodyParam('import_merge')) {
-                    $newConfig = array_merge($newConfig, $GLOBALS['cf']->getConfigArray());
+                    $newConfig = array_merge($newConfig, $configFile->getConfigArray());
                 }
 
                 $newConfig = array_merge($newConfig, $configuration);
@@ -152,7 +153,7 @@ final class ManageController implements InvocableController
                     $_POST[str_replace('/', '-', (string) $k)] = $v;
                 }
 
-                $GLOBALS['cf']->resetConfigData();
+                $configFile->resetConfigData();
                 $allOk = $formDisplay->process(true, false);
                 $allOk = $allOk && ! $formDisplay->hasErrors();
                 $_POST = $postParamBackup;
@@ -179,7 +180,7 @@ final class ManageController implements InvocableController
                         'return_url' => $returnUrl,
                     ]);
 
-                    return null;
+                    return $this->response->response();
                 }
 
                 // check for ThemeDefault
@@ -198,7 +199,7 @@ final class ManageController implements InvocableController
                 }
 
                 // save settings
-                $result = $this->userPreferences->save($GLOBALS['cf']->getConfigArray());
+                $result = $this->userPreferences->save($configFile->getConfigArray());
                 if ($result === true) {
                     if ($returnUrl) {
                         $GLOBALS['query'] = Util::splitURLQuery($returnUrl);
@@ -221,7 +222,7 @@ final class ManageController implements InvocableController
                     $this->config->loadUserPreferences($this->themeManager);
                     $this->userPreferences->redirect($returnUrl ?? '', $redirectParams);
 
-                    return null;
+                    return $this->response->response();
                 }
 
                 $GLOBALS['error'] = $result;
@@ -232,12 +233,12 @@ final class ManageController implements InvocableController
                 $this->config->removeCookie('pma_lang');
                 $this->userPreferences->redirect('index.php?route=/preferences/manage');
 
-                return null;
+                return $this->response->response();
             }
 
             $GLOBALS['error'] = $result;
 
-            return null;
+            return $this->response->response();
         }
 
         $relationParameters = $this->relation->getRelationParameters();
@@ -269,6 +270,6 @@ final class ManageController implements InvocableController
             define('PMA_DISABLE_NAVI_SETTINGS', true);
         }
 
-        return null;
+        return $this->response->response();
     }
 }

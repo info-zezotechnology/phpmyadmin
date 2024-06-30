@@ -20,6 +20,7 @@ use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Import\Import;
 use PhpMyAdmin\Import\ImportSettings;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\ParseAnalyze;
 use PhpMyAdmin\Plugins\Import\ImportFormat;
 use PhpMyAdmin\ResponseRenderer;
@@ -58,7 +59,7 @@ final class ImportController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['goto'] ??= null;
         $GLOBALS['display_query'] ??= null;
@@ -175,7 +176,7 @@ final class ImportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addJSON('message', $GLOBALS['message']);
 
-            return null; // the footer is displayed automatically
+            return $this->response->response();
         }
 
         // Add console message id to response output
@@ -190,7 +191,7 @@ final class ImportController implements InvocableController
             $this->response->setRequestStatus(false);
             $this->response->addHTML(Message::error(__('Incorrect format parameter'))->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         if (Current::$table !== '' && Current::$database !== '') {
@@ -303,7 +304,7 @@ final class ImportController implements InvocableController
                         $this->response->addJSON('sql_query', $GLOBALS['import_text']);
                         $this->response->addJSON('action_bookmark', $actionBookmark);
 
-                        return null;
+                        return $this->response->response();
                     }
 
                     ImportSettings::$runQuery = false;
@@ -324,7 +325,7 @@ final class ImportController implements InvocableController
                         $this->response->addJSON('action_bookmark', $actionBookmark);
                         $this->response->addJSON('id_bookmark', $idBookmark);
 
-                        return null;
+                        return $this->response->response();
                     }
 
                     ImportSettings::$runQuery = false;
@@ -407,7 +408,7 @@ final class ImportController implements InvocableController
                 $this->response->addJSON('message', $errorMessage->getDisplay());
                 $this->response->addHTML($errorMessage->getDisplay());
 
-                return null;
+                return $this->response->response();
             }
 
             $importHandle->setDecompressContent(true);
@@ -424,7 +425,7 @@ final class ImportController implements InvocableController
                 $this->response->addJSON('message', $errorMessage->getDisplay());
                 $this->response->addHTML($errorMessage->getDisplay());
 
-                return null;
+                return $this->response->response();
             }
         } elseif (! $GLOBALS['error'] && empty($GLOBALS['import_text'])) {
             $GLOBALS['message'] = Message::error(
@@ -441,7 +442,7 @@ final class ImportController implements InvocableController
             $this->response->addJSON('message', $GLOBALS['message']->getDisplay());
             $this->response->addHTML($GLOBALS['message']->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         // Convert the file's charset if necessary
@@ -634,7 +635,7 @@ final class ImportController implements InvocableController
                         $_SESSION['Import_message']['go_back_url'],
                     );
 
-                    return null;
+                    return $this->response->response();
                 }
 
                 if (Current::$table != $tableFromSql && $tableFromSql !== '') {
@@ -676,7 +677,7 @@ final class ImportController implements InvocableController
             $this->response->addJSON('ajax_reload', $GLOBALS['ajax_reload']);
             $this->response->addHTML($htmlOutput);
 
-            return null;
+            return $this->response->response();
         }
 
         if ($request->hasBodyParam('rollback_query')) {
@@ -705,7 +706,7 @@ final class ImportController implements InvocableController
             $this->response->addJSON('message', Message::success(ImportSettings::$message));
             $this->response->addJSON(
                 'sql_query',
-                Generator::getMessage(ImportSettings::$message, $GLOBALS['sql_query'], 'success'),
+                Generator::getMessage(ImportSettings::$message, $GLOBALS['sql_query'], MessageType::Success),
             );
         } elseif ($GLOBALS['result'] === false) {
             $this->response->setRequestStatus(false);
@@ -715,6 +716,6 @@ final class ImportController implements InvocableController
             include ROOT_PATH . $GLOBALS['goto'];
         }
 
-        return null;
+        return $this->response->response();
     }
 }

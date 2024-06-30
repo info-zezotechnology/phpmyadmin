@@ -9,6 +9,7 @@ use PhpMyAdmin\Core;
 use PhpMyAdmin\Current;
 use PhpMyAdmin\DatabaseInterface;
 use PhpMyAdmin\Html\Generator;
+use PhpMyAdmin\Http\Factory\ResponseFactory;
 use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Message;
@@ -27,16 +28,17 @@ use function sprintf;
  */
 final class GetFieldController implements InvocableController
 {
-    public function __construct(private readonly ResponseRenderer $response, private readonly DatabaseInterface $dbi)
-    {
+    public function __construct(
+        private readonly ResponseRenderer $response,
+        private readonly DatabaseInterface $dbi,
+        private readonly ResponseFactory $responseFactory,
+    ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
-        $this->response->disable();
-
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         /* Select database */
@@ -63,7 +65,7 @@ final class GetFieldController implements InvocableController
             /* l10n: In case a SQL query did not pass a security check  */
             $this->response->addHTML(Message::error(__('There is an issue with your request.'))->getDisplay());
 
-            return null;
+            return $this->response->response();
         }
 
         $transformKey = (string) $request->getQueryParam('transform_key', '');
@@ -80,19 +82,21 @@ final class GetFieldController implements InvocableController
                 $sql,
             );
 
-            return null;
+            return $this->response->response();
         }
+
+        $result ??= '';
 
         /* Avoid corrupting data */
         ini_set('url_rewriter.tags', '');
 
+        $response = $this->responseFactory->createResponse();
         Core::downloadHeader(
             Current::$table . '-' . $transformKey . '.bin',
             Mime::detect($result),
             mb_strlen($result, '8bit'),
         );
-        echo $result;
 
-        return null;
+        return $response->write($result);
     }
 }

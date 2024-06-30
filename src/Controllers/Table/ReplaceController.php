@@ -19,6 +19,7 @@ use PhpMyAdmin\Http\Response;
 use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\InsertEdit;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Plugins\IOTransformationsPlugin;
 use PhpMyAdmin\Query\Generator as QueryGenerator;
 use PhpMyAdmin\ResponseRenderer;
@@ -53,12 +54,12 @@ final class ReplaceController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['urlParams'] ??= null;
         $GLOBALS['message'] ??= null;
         if (! $this->response->checkParameters(['db', 'table', 'goto'])) {
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['errorUrl'] ??= null;
@@ -285,16 +286,14 @@ final class ReplaceController implements InvocableController
                 $gotoInclude = '/table/change';
             }
 
-            $this->moveBackToCallingScript($gotoInclude, $request);
-
-            return null;
+            return $this->moveBackToCallingScript($gotoInclude, $request);
         }
 
         // If there is a request for SQL previewing.
         if ($request->hasBodyParam('preview_sql')) {
             Core::previewSQL($GLOBALS['query']);
 
-            return null;
+            return $this->response->response();
         }
 
         $returnToSqlQuery = '';
@@ -324,19 +323,19 @@ final class ReplaceController implements InvocableController
         if ($rowSkipped) {
             $gotoInclude = '/table/change';
             $GLOBALS['message']->addMessagesString($insertErrors, '<br>');
-            $GLOBALS['message']->setType(Message::ERROR);
+            $GLOBALS['message']->setType(MessageType::Error);
         }
 
         $GLOBALS['message']->addMessages($lastMessages, '<br>');
 
         if (! empty($warningMessages)) {
             $GLOBALS['message']->addMessagesString($warningMessages, '<br>');
-            $GLOBALS['message']->setType(Message::ERROR);
+            $GLOBALS['message']->setType(MessageType::Error);
         }
 
         if (! empty($errorMessages)) {
             $GLOBALS['message']->addMessagesString($errorMessages);
-            $GLOBALS['message']->setType(Message::ERROR);
+            $GLOBALS['message']->setType(MessageType::Error);
         }
 
         /**
@@ -353,7 +352,7 @@ final class ReplaceController implements InvocableController
              */
             $this->doTransformations($mimeMap, $request);
 
-            return null;
+            return $this->response->response();
         }
 
         if (! empty($returnToSqlQuery)) {
@@ -374,9 +373,7 @@ final class ReplaceController implements InvocableController
             unset($_POST['where_clause']);
         }
 
-        $this->moveBackToCallingScript($gotoInclude, $request);
-
-        return null;
+        return $this->moveBackToCallingScript($gotoInclude, $request);
     }
 
     /** @param string[][] $mimeMap */
@@ -464,27 +461,21 @@ final class ReplaceController implements InvocableController
         $this->response->addJSON($extraData);
     }
 
-    private function moveBackToCallingScript(string $gotoInclude, ServerRequest $request): void
+    private function moveBackToCallingScript(string $gotoInclude, ServerRequest $request): Response
     {
         if ($gotoInclude === '/sql') {
-            ($this->sqlController)($request);
-
-            return;
+            return ($this->sqlController)($request);
         }
 
         if ($gotoInclude === '/database/sql') {
-            ($this->databaseSqlController)($request);
-
-            return;
+            return ($this->databaseSqlController)($request);
         }
 
         if ($gotoInclude === '/table/sql') {
-            ($this->tableSqlController)($request);
-
-            return;
+            return ($this->tableSqlController)($request);
         }
 
-        ($this->changeController)($request);
+        return ($this->changeController)($request);
     }
 
     /**

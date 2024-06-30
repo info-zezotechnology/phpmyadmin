@@ -18,6 +18,7 @@ use PhpMyAdmin\Http\ServerRequest;
 use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\InvalidDatabaseName;
 use PhpMyAdmin\Message;
+use PhpMyAdmin\MessageType;
 use PhpMyAdmin\Operations;
 use PhpMyAdmin\Plugins;
 use PhpMyAdmin\Query\Utilities;
@@ -45,7 +46,7 @@ final class DatabaseController implements InvocableController
     ) {
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['message'] ??= null;
         $GLOBALS['errorUrl'] ??= null;
@@ -210,7 +211,7 @@ final class DatabaseController implements InvocableController
                 );
                 $this->response->addJSON('db', Current::$database);
 
-                return null;
+                return $this->response->response();
             }
         }
 
@@ -225,7 +226,7 @@ final class DatabaseController implements InvocableController
         }
 
         if (! $this->response->checkParameters(['db'])) {
-            return null;
+            return $this->response->response();
         }
 
         $config = Config::getInstance();
@@ -238,12 +239,12 @@ final class DatabaseController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $GLOBALS['urlParams']['goto'] = Url::getFromRoute('/database/operations');
@@ -257,7 +258,7 @@ final class DatabaseController implements InvocableController
         $dbCollation = $this->dbi->getDbCollation(Current::$database);
 
         if (Utilities::isSystemSchema(Current::$database)) {
-            return null;
+            return $this->response->response();
         }
 
         $databaseComment = '';
@@ -289,7 +290,7 @@ final class DatabaseController implements InvocableController
             $GLOBALS['message']->addParamHtml('</a>');
             /* Show error if user has configured something, notice elsewhere */
             if (! empty($config->settings['Servers'][Current::$server]['pmadb'])) {
-                $GLOBALS['message']->setType(Message::ERROR);
+                $GLOBALS['message']->setType(MessageType::Error);
             }
         }
 
@@ -306,6 +307,6 @@ final class DatabaseController implements InvocableController
             'collations' => $collations,
         ]);
 
-        return null;
+        return $this->response->response();
     }
 }

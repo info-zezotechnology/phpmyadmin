@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpMyAdmin\Controllers\Table;
 
+use DateTimeImmutable;
 use PhpMyAdmin\Charsets;
 use PhpMyAdmin\ColumnFull;
 use PhpMyAdmin\Config;
@@ -40,7 +41,6 @@ use stdClass;
 use function __;
 use function in_array;
 use function str_contains;
-use function strtotime;
 
 /**
  * Displays table structure infos like columns, indexes, size, rows
@@ -62,7 +62,7 @@ class StructureController implements InvocableController
         $this->tableObj = $this->dbi->getTable(Current::$database, Current::$table);
     }
 
-    public function __invoke(ServerRequest $request): Response|null
+    public function __invoke(ServerRequest $request): Response
     {
         $GLOBALS['errorUrl'] ??= null;
 
@@ -77,7 +77,7 @@ class StructureController implements InvocableController
         $relationParameters = $this->relation->getRelationParameters();
 
         if (! $this->response->checkParameters(['db', 'table'])) {
-            return null;
+            return $this->response->response();
         }
 
         $isSystemSchema = Utilities::isSystemSchema(Current::$database);
@@ -94,12 +94,12 @@ class StructureController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No databases selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No databases selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $tableName = TableName::tryFrom($request->getParam('table'));
@@ -108,12 +108,12 @@ class StructureController implements InvocableController
                 $this->response->setRequestStatus(false);
                 $this->response->addJSON('message', Message::error(__('No table selected.')));
 
-                return null;
+                return $this->response->response();
             }
 
             $this->response->redirectToRoute('/', ['reload' => true, 'message' => __('No table selected.')]);
 
-            return null;
+            return $this->response->response();
         }
 
         $primary = Index::getPrimary($this->dbi, Current::$table, Current::$database);
@@ -132,7 +132,7 @@ class StructureController implements InvocableController
             $request->getRoute(),
         ));
 
-        return null;
+        return $this->response->response();
     }
 
     /**
@@ -365,15 +365,15 @@ class StructureController implements InvocableController
         }
 
         if (isset($showTable['Create_time'])) {
-            $showTable['Create_time'] = Util::localisedDate(strtotime($showTable['Create_time']));
+            $showTable['Create_time'] = Util::localisedDate(new DateTimeImmutable($showTable['Create_time']));
         }
 
         if (isset($showTable['Update_time'])) {
-            $showTable['Update_time'] = Util::localisedDate(strtotime($showTable['Update_time']));
+            $showTable['Update_time'] = Util::localisedDate(new DateTimeImmutable($showTable['Update_time']));
         }
 
         if (isset($showTable['Check_time'])) {
-            $showTable['Check_time'] = Util::localisedDate(strtotime($showTable['Check_time']));
+            $showTable['Check_time'] = Util::localisedDate(new DateTimeImmutable($showTable['Check_time']));
         }
 
         return $this->template->render('table/structure/display_table_stats', [

@@ -24,6 +24,7 @@ use PhpMyAdmin\SqlParser\Utils\Query;
 use PhpMyAdmin\SqlParser\Utils\StatementInfo;
 use PhpMyAdmin\SqlParser\Utils\StatementType;
 use PhpMyAdmin\Table\Table;
+use PhpMyAdmin\Table\UiProperty;
 use PhpMyAdmin\Utils\ForeignKey;
 
 use function __;
@@ -82,7 +83,7 @@ class Sql
 
         if (! $statementInfo->flags->order) {
             // Retrieving the name of the column we should sort after.
-            $sortCol = $tableObject->getUiProp(Table::PROP_SORTED_COLUMN);
+            $sortCol = $tableObject->getUiProp(UiProperty::SortedColumn);
             if (empty($sortCol)) {
                 return $statementInfo;
             }
@@ -106,7 +107,7 @@ class Sql
         } else {
             // Store the remembered table into session.
             $tableObject->setUiProp(
-                Table::PROP_SORTED_COLUMN,
+                UiProperty::SortedColumn,
                 Query::getClause(
                     $statementInfo->statement,
                     $statementInfo->parser->list,
@@ -659,24 +660,25 @@ class Sql
                     $unlimNumRows = $this->dbi->getTable($db, $table)->countRecords(true);
                 }
             } else {
+                /** @var SelectStatement $statement */
                 $statement = $statementInfo->statement;
 
-                // Remove ORDER BY to decrease unnecessary sorting time
-                if ($statementInfo->flags->order) {
-                    $statement->order = null;
-                }
-
-                // Removes LIMIT clause that might have been added
-                if ($statementInfo->flags->limit) {
-                    $statement->limit = false;
-                }
-
-                if (
-                    ! $statementInfo->flags->isGroup
+                $changeExpression = ! $statementInfo->flags->isGroup
                     && ! $statementInfo->flags->distinct
                     && ! $statementInfo->flags->union
-                    && count($statement->expr) === 1
-                ) {
+                    && count($statement->expr) === 1;
+
+                if ($statementInfo->flags->order || $statementInfo->flags->limit || $changeExpression) {
+                    $statement = clone $statement;
+                }
+
+                // Remove ORDER BY to decrease unnecessary sorting time
+                $statement->order = null;
+
+                // Removes LIMIT clause that might have been added
+                $statement->limit = null;
+
+                if ($changeExpression) {
                     $statement->expr[0] = new Expression();
                     $statement->expr[0]->expr = '1';
                 }
@@ -922,7 +924,7 @@ class Sql
             $message = $this->getMessageForNoRowsReturned($messageToShow, $statementInfo, $numRows);
         }
 
-        $queryMessage = Generator::getMessage($message, $GLOBALS['sql_query'], 'success');
+        $queryMessage = Generator::getMessage($message, $GLOBALS['sql_query'], MessageType::Success);
 
         if (isset($GLOBALS['show_as_php'])) {
             return $queryMessage;
@@ -1183,7 +1185,7 @@ class Sql
         Message|string $displayMessage,
     ): string {
         if ($displayQuery !== null && $showSql && $sqlData === []) {
-            return Generator::getMessage($displayMessage, $displayQuery, 'success');
+            return Generator::getMessage($displayMessage, $displayQuery, MessageType::Success);
         }
 
         return '';
@@ -1555,7 +1557,7 @@ class Sql
 
             $message = $this->getMessageForNoRowsReturned($messageToShow, $statementInfo, 0);
 
-            return Generator::getMessage($message, $GLOBALS['sql_query'], 'success');
+            return Generator::getMessage($message, $GLOBALS['sql_query'], MessageType::Success);
         }
 
         // Handle disable/enable foreign key checks
