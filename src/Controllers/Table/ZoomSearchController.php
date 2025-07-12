@@ -17,6 +17,7 @@ use PhpMyAdmin\Identifiers\DatabaseName;
 use PhpMyAdmin\Identifiers\TableName;
 use PhpMyAdmin\Message;
 use PhpMyAdmin\ResponseRenderer;
+use PhpMyAdmin\Routing\Route;
 use PhpMyAdmin\Table\Search;
 use PhpMyAdmin\Template;
 use PhpMyAdmin\UniqueCondition;
@@ -47,6 +48,7 @@ use function strtoupper;
  *
  * Display table zoom search form, create SQL queries from form data.
  */
+#[Route('/table/zoom-search', ['GET', 'POST'])]
 final class ZoomSearchController implements InvocableController
 {
     /** @var list<string> */
@@ -138,7 +140,7 @@ final class ZoomSearchController implements InvocableController
         /**
          * Handle AJAX request for data row on point select
          */
-        if (isset($_POST['get_data_row']) && $_POST['get_data_row'] == true) {
+        if (isset($_POST['get_data_row']) && $_POST['get_data_row']) {
             $this->getDataRowAction();
 
             return $this->response->response();
@@ -210,7 +212,7 @@ final class ZoomSearchController implements InvocableController
             }
 
             // reformat mysql query output
-            if (strncasecmp($type, 'set', 3) == 0 || strncasecmp($type, 'enum', 4) == 0) {
+            if (strncasecmp($type, 'set', 3) === 0 || strncasecmp($type, 'enum', 4) === 0) {
                 $type = str_replace(',', ', ', $type);
             } else {
                 // strip the "BINARY" attribute, except if we find "BINARY(" because
